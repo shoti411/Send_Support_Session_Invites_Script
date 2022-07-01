@@ -1,0 +1,104 @@
+// To learn how to use this script, refer to the documentation:
+// https://developers.google.com/apps-script/samples/automations/mail-merge
+
+/*
+Copyright 2022 Martin Hawksey
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+/**
+ * @OnlyCurrentDoc
+*/
+
+/**
+ * Change these to match the column names you are using for email 
+ * recipient addresses and email sent column.
+*/
+const RECIPIENT_EMAIL_ADDRESS_COL = "Manager Email"; //"Manager's Email"
+const NOTES_COL = "Orientation Notes";
+const NEW_HIRE_EMAIL_ADDRESS_COL  = "Email";
+const NEW_HIRE_USERNAME_COL = "Username";
+const NAME_COL = "Name";
+const NEW_HIRE_TICKET_COL = "Ticket";
+const FOLLOW_UP_COL = "Follow up?";
+
+// Event name which we want to invite the emails to
+const EVENT_NAME = '[Optional] Corporate ET Onboarding Support Session';
+//const EVENT_NAME = 'Testing Recurring Event';
+
+
+// put because needs to start editing from right row
+const STARTING_ROW_INDEX = 0;
+
+// The VDI Email Subject
+const MISSING_ACCOUNT_INFO_EMAIL_SUBJECT_LINE = "New Hire {{Name}} Account Info";
+
+const MISSING_RITM_TICKET_EMAIL_SUBJECT_LINE = "New hire {{Name}} RITM Ticket";
+
+// the Mac VDI Connection Guide URL
+var orientationDate = "";
+
+// The Missing Account Information Email Template
+const MISSING_ACCOUNT_INFO_EMAIL_TEMPLATE = 
+"Hello," + "<br> <br>" + 
+
+"We are currently preparing for our ET orientation on Monday " + orientationDate + " and noticed that your new hire {{Name}} currently does not have the proper accounts created for them. Can you please confirm that they have no pending tasks in Workday and/or Greenhouse? Once this is completed their accounts will be created." + "<br> <br>" +
+
+"If there is no pending approval for this user, please advise and I will reach out to the proper team to correct their account creation process." + "<br> <br> " +
+
+"Thank you," + "<br>" +
+"IT New Hires";
+
+const MISSING_RITM_TICKET_EMAIL_TEMPLATE = 
+"Hello," + "<br> <br>" +
+
+"We are preparing for our ET new hire orientation on Monday " + orientationDate + " and noticed that your new hire {{Name}} has not had a new hire setup ticket submitted yet. Could you please fill out this form on their behalf to ensure they will receive their required equipment on time?" + "<br> <br> " +
+
+"Thank you," + "<br>" +
+"IT New Hires";
+
+
+/** 
+ * Creates the menu item "Send Mac VDI Credentials Email" for user to run scripts on drop-down.
+ */
+function onOpen() {
+const ui = SpreadsheetApp.getUi();
+ui.createMenu('Send Missing Info Emails')
+  .addItem('Missing RITM Ticket', 'sendRITMMessage')
+  .addItem('Missing Account Information', 'sendAccountMessage')
+  .addToUi();
+
+  ui.createMenu('Send Support Session Invites')
+  .addItem('Send Email Invites', 'promptDateAndTimeOfEvent')
+  .addToUi();
+}
+
+/**
+ * Sends Missing RITM Email to Specific User on the sheet.
+ * @param {Integer} rowIndex the specific row Index to send the email about
+ * @param {Sheet} sheet to read data from
+*/
+function sendRITMMessage(rowIndex, sheet=SpreadsheetApp.getActiveSheet()) {
+  setSingleEmailPrompt(MISSING_RITM_TICKET_EMAIL_SUBJECT_LINE, rowIndex);
+}
+
+/**
+ * Sends Missing Account Info Email to Specific User on the sheet.
+ * @param {Integer} rowIndex the specific row Index to send the email about
+ * @param {Sheet} sheet to read data from
+*/
+function sendAccountMessage(rowIndex, sheet=SpreadsheetApp.getActiveSheet()) {
+  setSingleEmailPrompt(MISSING_ACCOUNT_INFO_EMAIL_SUBJECT_LINE, rowIndex);
+}
+

@@ -1,0 +1,88 @@
+/**
+ * Sends an email draft from the specified email address after filling in the template (Note that to change who the email is from - like to ITNewHires@wayfair.com - you have to use an alias and you have to link it to your gmail account in the gmail settings)
+ * @param {String} emailTemplate the specified name of the draft in your email which contains the template email of what to fill in.
+ * @param {Array} row the row of credentials which you are sending the email about
+ * @param {Integer} rowToStartIndex the number of rows to shift until you get to the row index which contains the credentials specified
+ * @param {Integer} rowIdx the row index of the credentials which you are sending the email about
+ * @param {Integer} emailSentColIdx the notes column index in the row for which we record the sent date column
+ * @param {Array} out the array to record the changes to the notes column
+ * 
+ */
+function sendAnEmail(emailTemplate, row, rowToStartIndex, rowIdx, emailSentColIdx, out, sheet = SpreadsheetApp.getActiveSheet()) {
+  try {
+    const msgObj = fillInTemplateFromObject_(emailTemplate.message, row);
+
+    // Gets the row range for which to change the color
+    var rangeColorChange = sheet.getRange(rowIdx + rowToStartIndex, emailSentColIdx + 1, out.length);
+
+    // check if email valid or not
+    if (isEmailValid(row[RECIPIENT_EMAIL_ADDRESS_COL])) {
+
+      // See https://developers.google.com/apps-script/reference/gmail/gmail-app#sendEmail(String,String,String,Object)
+      // If you need to send emails with unicode/emoji characters change GmailApp for MailApp
+      // Uncomment advanced parameters as needed (see docs for limitations)
+      GmailApp.sendEmail(row[RECIPIENT_EMAIL_ADDRESS_COL], msgObj.subject, msgObj.text, {
+        htmlBody: msgObj.html,
+        // bcc: 'a.bbc@email.com',
+        // cc: 'a.cc@email.com',
+        from: 'ITNewHires@wayfair.com',
+        // name: 'name of the sender',
+        // replyTo: 'a.reply@email.com',
+        // noReply: true, // if the email should be sent from a generic no-reply email address (not available to gmail.com users)
+        attachments: emailTemplate.attachments,
+        inlineImages: emailTemplate.inlineImages
+      });
+      // Edits cell to record email sent date
+      out.push(['Email Sent on ' + (new Date())]);
+
+      // changes the color of the row range to green when successfully sent email
+      // light green 3 color = #d9ead3 in hexadecimal = (217, 234, 211) in rgb
+      rangeColorChange.setBackgroundRGB(217, 234, 211);
+
+    } else {
+
+      out.push(['Email Address Invalid']);
+
+      // highlight it red because was invalid email address
+      rangeColorChange.setBackgroundRGB(255, 0, 0);
+
+    }
+
+  } catch (e) {
+    // modify cell to record error
+    out.push([e.message]);
+
+    // changes the color of the row to red when failed to send email
+    // red color = #FF0000 in hexadecimal = (255, 0, 0) in rgb
+    rangeColorChange.setBackgroundRGB(255, 0, 0);
+  }
+}
+
+
+/**
+ * Checks whether the given email is a valid email or not. Returns yes when valid.
+ * @param {String} email the email to check whether it is valid or not
+ */
+function isEmailValid(email) {
+
+
+  var url = "https://api.eva.pingutil.com/email?email=" + email;
+  var res = UrlFetchApp.fetch(url);
+
+  // Get status of the API
+  var status = res.getResponseCode();
+  if (status != 200) {
+    return false;
+  }
+  var contextText = res.getContentText();
+
+  var result = JSON.parse(contextText);
+
+  // Logic to check Business Email
+  // I took out this result["data"]["webmail"] === false from the and statements so that we can invite users using their personal emails
+  if (result["data"]["disposable"] === false && result["data"]["spam"] === false && result["data"]["deliverable"] === true) {
+    return true
+  }
+
+  return false;
+}

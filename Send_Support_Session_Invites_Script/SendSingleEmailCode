@@ -1,0 +1,102 @@
+
+/**
+ * Creates an alert that prompts for the selected row and then sends the email to the selected user in that row (to the email address in the "Email Address" field)
+ * @param {String} subjectLine for the email template
+ * @param {integer} rowIndex to get the row containing the specific user for the email draft message
+ * @param {Sheet} sheet to read data from
+ */
+function setSingleEmailPrompt(subjectLine, rowIndex, sheet=SpreadsheetApp.getActiveSheet()) {
+  var inputBoxHeader = "Send Single Row Email";
+
+  switch(subjectLine) {
+    case MISSING_RITM_TICKET_EMAIL_SUBJECT_LINE:
+      inputBoxHeader = "Send Missing RITM Ticket Email to Manager";
+      break;
+    case MISSING_ACCOUNT_INFO_EMAIL_SUBJECT_LINE:
+      inputBoxHeader = "Send Missing Account Info Email to Manager";
+      break;
+    default:
+      inputBoxHeader = "Send Single Row Email";
+      break;
+  }
+
+
+if (!rowIndex){
+rowIndex = Browser.inputBox(inputBoxHeader, 
+                                "Type or copy/paste the Row Number Google Sheet of the user who you would like to send their corresponding information to:",
+                                Browser.Buttons.OK_CANCEL);
+
+
+sendSingleEmail(subjectLine, rowIndex);
+}
+
+/** 
+if (!subjectLine){
+subjectLine = Browser.inputBox("Mail Merge", 
+                                  "Type or copy/paste the subject line of the Gmail " +
+                                  "draft message you would like to mail merge with:",
+                                  Browser.Buttons.OK_CANCEL);
+                                  
+if (subjectLine === "cancel" || subjectLine == ""){ 
+// If no subject line, finishes up
+return;
+}
+}
+*/
+
+// If empty then don't continue
+else if (rowIndex === "cancel" || rowIndex == ""){ 
+// If no row Index, finishes up
+return;
+}
+}
+
+
+/**
+ * Sends a email using the template to the user in the selected row (need to input the row)
+ * @param {String} subjectLine for the email draft
+ * @param {integer} rowIndex for the email draft message
+ * @param {Sheet} sheet to read data from
+ */
+function sendSingleEmail(subjectLine, rowIndex, sheet=SpreadsheetApp.getActiveSheet()){
+
+
+// Gets the data from the passed sheet
+const dataRange = sheet.getDataRange();
+// Fetches displayed values for each row in the Range HT Andrew Roberts 
+// https://mashe.hawksey.info/2020/04/a-bulk-email-mail-merge-with-gmail-and-google-sheets-solution-evolution-using-v8/#comment-187490
+// @see https://developers.google.com/apps-script/reference/spreadsheet/range#getdisplayvalues
+const data = dataRange.getDisplayValues();
+
+// Assumes row 1 contains our column headings
+const heads = data.shift();
+
+// After finding the Notes column, splice the array by removing all the rows of columns that do not contain the info to log in to the MAC VDI
+
+// Splice returns the array, removing elements from within the indexes specified (including startIndex specified)
+// splice(startIndex, howMany, item1, ..., itemX);
+/** const months = ["Jan", "Feb", "March", "April", "May"];
+ *  months.splice(1,2); => returns months = ["Jan", "April", "May"]
+*/
+data.splice(0,(rowIndex-2));
+// so now data array only has the 1 row of data
+data.splice(1, data.length);
+
+
+// Converts 2d array into an object array - objects, keys, and values
+// See https://stackoverflow.com/a/22917499/1027723
+// For a pretty version, see https://mashe.hawksey.info/?p=17869/#comment-184945
+const obj = data.map(r => (heads.reduce((o, k, i) => (o[k] = r[i] || '', o), {})));
+
+// Creates an array to record sent emails
+const out = [];
+
+
+sendArrayOfEmails(subjectLine, obj, rowIndex, heads, out, false);
+}
+
+
+
+
+
+

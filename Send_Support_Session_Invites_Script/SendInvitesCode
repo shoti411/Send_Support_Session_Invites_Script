@@ -1,0 +1,186 @@
+function promptDateAndTimeOfEvent(dateAndTimeString) {
+    if (!dateAndTimeString) {
+  
+      dateAndTimeString = Browser.inputBox("Input Corporate Support Session Date", "Please Input the date of the corporate support session in a MM/DD/YYYY format (to send invites to the support session on the date inputted):", Browser.Buttons.OK_CANCEL);
+  
+      const monthString = dateAndTimeString.substring(0, 2);
+  
+      const monthIndex = parseInt(monthString);
+      // for some reason when making dates, months start at 0 but days don't so we have to change it
+      const month = monthIndex - 1;
+  
+      const dayString = dateAndTimeString.substring(3, 5);
+      const day = parseInt(dayString);
+  
+      const year = parseInt(dateAndTimeString.substring(6));
+  
+      const date = new Date(year, month, day, 0, 0, 0);
+      // if the addition makes the number go over 31, then will the date function will fix itself to make it the next possible day
+      const endOfDate = new Date(year, month, (day + 1));
+      //const brokendate = new Date(year, 11, (31 + 1));
+      //Browser.msgBox(brokendate);
+  
+      //try {
+      //const calendarId = "primary";
+      // The ID for a user's default calendar is their email address.
+      const calendarId = Session.getActiveUser().getEmail();
+  
+  
+      // gives list of CalendarEvent class things
+      const eventList = CalendarApp.getCalendarById(calendarId).getEventsForDay(date, { search: EVENT_NAME });
+      if (eventList.length <= 0) {
+        Browser.msgBox("No Corporate Support Sessions Found On Date Given!");
+        return;
+      }
+  
+      // gives event as CalendarEvent class : https://developers.google.com/apps-script/reference/calendar/calendar-event
+      // but does not give it as the Event class
+      // so even though we have the CalendarEvent and can access the iCalUID, we cannot access the specific eventId for the Event class
+      const calEvent = eventList[0];
+  
+      // this gives the iCalUId - the recurring calendar event ID (we're using this to get the instance of the recurring event on the date specified)
+      const recurringEventId = calEvent.getId().split('@')[0];
+  
+      // Browser.msgBox(new Date(endOfDate.getTime()).toISOString());
+  
+      // doing this so we can get look through the instances of the event to get the specific event id of the event on the date | originalStart format = "yyyy-MM-dd" ~ ex: "2022-04-18"
+      // should return 1 event in the array
+      var recurringEventInstancesList = Calendar.Events.instances(calendarId, recurringEventId, { maxResults: 250, timeMin: new Date(date.getTime()).toISOString(), timeMax:  new Date(endOfDate.getTime()).toISOString()}).items;
+  
+      var event;
+      var eventId;
+  
+      // if there are no events in the array, then make the event the corresponding calendarEvent (CalendarEvent class) which means you can go ahead and send the email invite to the person
+      if (recurringEventInstancesList.length == 0) {
+        event = calEvent;
+        eventId = recurringEventId;
+      } else {
+        // get the first event in the recurring event instances list which is on the day (limit is next day) and get the id (we finally got the specific event id!!!)
+        event = recurringEventInstancesList[0];
+  
+        eventId = event.id;
+      }
+  
+      sendAllInvites(calEvent, eventId);
+  
+    } else if (dateAndTimeString == "cancel" || dateAndTimeString == "") {
+      // If no date and time entered, finishes up
+      return;
+    }
+  
+  }
+  
+  
+  
+  function sendAllInvites(calEvent, eventId, sheet = SpreadsheetApp.getActiveSheet()) {
+  
+    const dataRange = sheet.getDataRange();
+  
+    const data = dataRange.getDisplayValues();
+  
+    const heads = data.shift();
+  
+    const obj = data.map(r => (heads.reduce((o, k, i) => (o[k] = r[i] || '', o), {})));
+  
+    const calendarId = Session.getActiveUser().getEmail();
+  
+    const loNotYetInvitedUsers = [];
+  
+    //Browser.msgBox("Event ID: " + eventId);
+  
+    // if the calendar event's getId function returns the event id, then we know the meeting is non-recurring
+    // then we know we should just add each user individually
+  
+  
+    obj.forEach(function (row, rowIdx) {
+      // if follow up check box is marked as true, send an invite to them
+      // ignore if follow-up col is false
+      if (row[FOLLOW_UP_COL] == "TRUE") {
+  
+        // the calendarid should be the user whos running the script's email address
+        // should be Session.getActiveUser()
+  
+        // if email field is populated and valid, then send it,
+        if (row[NEW_HIRE_EMAIL_ADDRESS_COL] != "") {
+  
+          if (isEmailValid(row[NEW_HIRE_EMAIL_ADDRESS_COL])) {
+          // add the email to the invite list
+            sendInvite(calendarId, eventId, calEvent, row[NEW_HIRE_EMAIL_ADDRESS_COL]);
+          } else {
+            // then we know the invite is invalid so add them to the list and make the corresponding boxes red
+            // add the user to the list of not yet invited users (because of error)
+          loNotYetInvitedUsers.push(row[NAME_COL]);
+  
+          // change the boxes to red
+          // the plus 2 is for specifying the column right after the header
+          sheet.getRange(rowIdx+2, heads.indexOf(NEW_HIRE_EMAIL_ADDRESS_COL) + 1, 1).setBackground('red');
+          sheet.getRange(rowIdx+2, heads.indexOf(NOTES_COL) + 1, 1).setBackground('red');
+  
+          var currentNotes = row[NOTES_COL];
+  
+          var newNotes = currentNotes + " | " + "Error, Unable to invite to support session (Invalid Email or Email did not send)";
+          // also add the note that it didn't invite the specific user to the support session because their email was missing from the sheet or their email address was invalid
+          sheet.getRange(rowIdx+2, heads.indexOf(NOTES_COL) + 1).setValue(newNotes);
+          }
+        } else {
+          // if checked for followup, but email box is empty or email is invalid, set the email address box as red and the orientation notes box as red and record it in the list
+  
+          // add the user to the list of not yet invited users (because of error)
+          loNotYetInvitedUsers.push(row[NAME_COL]);
+  
+          // change the boxes to red
+          // the plus 2 is for specifying the column right after the header
+          sheet.getRange(rowIdx+2, heads.indexOf(NEW_HIRE_EMAIL_ADDRESS_COL) + 1, 1).setBackground('red');
+          sheet.getRange(rowIdx+2, heads.indexOf(NOTES_COL) + 1, 1).setBackground('red');
+  
+          var currentNotes = row[NOTES_COL];
+  
+          var newNotes = currentNotes + " | " + "Error, Unable to invite to support session (Missing Email)";
+          // also add the note that it didn't invite the specific user to the support session because their email was missing from the sheet or their email address was invalid
+          sheet.getRange(rowIdx+2, heads.indexOf(NOTES_COL) + 1).setValue(newNotes);
+  
+        }
+      }
+  
+    })
+    
+    //Browser.msgBox(event);
+  
+    //Browser.msgBox(event.attendees);
+  
+  
+    if (loNotYetInvitedUsers.length == 0) {
+      Browser.msgBox("Able to invite all users!");
+    } else {
+      Browser.msgBox("Unable to invite these users: " + loNotYetInvitedUsers);
+    }
+  }
+  
+  
+  
+  
+  /**
+   * Send the invite to the given email for the Calendar event in the email
+   * {String} calendarId the id of the given calendar where the event is located
+   * {String} eventId the ID of the given event which the usere is going to be invited to
+   * {String} emailAddress the given email address which will be invited to the event and will receive the google calendar event notification
+   */
+  function sendInvite(calendarId, eventId, calEvent, emailAddress) {
+    var event = Calendar.Events.get(calendarId, eventId);
+    //Browser.msgBox("Event: " + event); // correctly identified event first time round
+    //Browser.msgBox(event);
+    //Browser.msgBox(calEvent);
+  
+    if(event.attendees) {
+      event.attendees.push({
+        email: emailAddress
+      });
+    } else {
+      event.attendees = new Array({email: emailAddress});
+    }
+  
+    event = Calendar.Events.patch(event, calendarId, eventId, {
+      sendNotifications: true
+    });
+  }
+  
