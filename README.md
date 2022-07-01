@@ -13,3 +13,8 @@ NEEDS TO HAVE THE CALENDAR SERVICE ENABLED UNDER SERVICES FOR APPSCRIPT:
 
 
 A copy of the NA Corporate Support Session Tracker: https://docs.google.com/spreadsheets/d/16Fkv1TkdHqcgoCHYY0jNIqZZxhLdKYNTswkPJk7iKC0/edit#gid=770028178
+
+
+
+
+InfoHub Article: https://infohub.corp.wayfair.com/display/ER/Using+the+NA+Corporate+Orientation+Tracker+Send+Invite+Function
